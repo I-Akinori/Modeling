@@ -3,32 +3,69 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+public class DPoint
+{
+    private static int count = 0;
+    private Vector2 pos;
+    private int index;
+
+    public DPoint(float x, float y)
+    {
+        index = count;
+        count++;
+        pos = new Vector2(x, y);
+    }
+
+    public DPoint(Vector2 v)
+    {
+        index = count;
+        count++;
+        pos = v;
+    }
+
+    public DPoint(Point P)
+    {
+        index = count;
+        count++;
+        pos = P.Pos;
+    }
+
+    public Vector2 Pos
+    {
+        set { pos = value; }
+        get { return pos; }
+    }
+    public int Index
+    {
+        set { index = value; }
+        get { return index; }
+    }
+}
 public class Triangle
 {
-    Point[] vertices;
-    Triangle parent;
+    DPoint[] vertices;
     List<Triangle> children;
     
-    public Triangle(Point P1, Point P2, Point P3)
+    public Triangle(DPoint P1, DPoint P2, DPoint P3)
     {
-        vertices = new Point[] {P1, P2, P3};
+        vertices = new DPoint[] {P1, P2, P3};
         children = new List<Triangle>();
     }
 
-    public bool include(Point P)
+    public bool include(DPoint P)
     {
-        return true;
+        bool b1 = (vertices[1].Pos.x - P.Pos.x) * (vertices[2].Pos.y - P.Pos.y) - (vertices[2].Pos.x - P.Pos.x) * (vertices[1].Pos.y - P.Pos.y) > 0f;
+        bool b2 = (vertices[2].Pos.x - P.Pos.x) * (vertices[0].Pos.y - P.Pos.y) - (vertices[0].Pos.x - P.Pos.x) * (vertices[2].Pos.y - P.Pos.y) > 0f;
+        bool b3 = (vertices[0].Pos.x - P.Pos.x) * (vertices[1].Pos.y - P.Pos.y) - (vertices[1].Pos.x - P.Pos.x) * (vertices[0].Pos.y - P.Pos.y) > 0f;
+
+        return (b1 == b2) && (b2 == b3);
     }
-    public Point[] Vertices
+    public DPoint[] Vertices
     {
         set { vertices = value; }
         get { return vertices; }
     }
-    public Triangle Parent
-    {
-        set { parent = value; }
-        get { return parent; }
-    }
+
     public List<Triangle> Children
     {
         set { children = value; }
@@ -46,7 +83,7 @@ public class Delaunay : MonoBehaviour
     private int[] _triangles = new int[] { };
     private Vector2[] _uvs = new Vector2[] { };
     List<Triangle> TriList = new List<Triangle>();
-    List<Point> PoiList = new List<Point>();
+    List<DPoint> PoiList = new List<DPoint>();
     float length = 10.0f;
     Triangle root;
     void List2Mesh()
@@ -87,20 +124,59 @@ public class Delaunay : MonoBehaviour
         _mesh.uv = _uvs;
 
         _mesh.RecalculateBounds();
+        _mesh.RecalculateBounds();
+    }
+
+    Triangle SearchLeaf(DPoint P, Triangle T)        // PがTの内部にあることは既知とする
+    {
+        if (T.Children.Count == 0)
+        {
+            return T;
+        }
+
+        for (int i = 0; i < T.Children.Count; i++)
+        {
+            if (T.Children[i].include(P))
+            {
+                return SearchLeaf(P, T.Children[i]);
+            }
+        }
+
+        return null;
+    }
+    void AddDPoint(DPoint P, Triangle T)
+    {
+        T.Children.Add(new Triangle(P, T.Vertices[0], T.Vertices[1]));
+        T.Children.Add(new Triangle(P, T.Vertices[1], T.Vertices[2]));
+        T.Children.Add(new Triangle(P, T.Vertices[2], T.Vertices[0]));
     }
     // Start is called before the first frame update
     void Start()
     {
         length = Sampling.length;
         root = new Triangle(
-            new Point(new Vector2(0, +2.0f * length)),
-            new Point(new Vector2(+1.5f * length, -length)),
-            new Point(new Vector2(-1.5f * length, -length))
+            new DPoint(new Vector2(0, +2.0f * length)),
+            new DPoint(new Vector2(+1.5f * length, -length)),
+            new DPoint(new Vector2(-1.5f * length, -length))
         );
         TriList.Add(root);
         PoiList.Add(root.Vertices[0]);
         PoiList.Add(root.Vertices[1]);
         PoiList.Add(root.Vertices[2]);
+
+        for (int i = 0; i < Sampling.confirmed.Count; i++)
+        {
+            DPoint DP = new DPoint(Sampling.confirmed[i]);
+            PoiList.Add(DP);
+
+            Triangle Target = SearchLeaf(DP, root);
+            AddDPoint(DP, Target);
+            TriList.Remove(Target);
+            TriList.Add(Target.Children[0]);
+            TriList.Add(Target.Children[1]);
+            TriList.Add(Target.Children[2]);
+        }
+
     }
 
     private void Awake()

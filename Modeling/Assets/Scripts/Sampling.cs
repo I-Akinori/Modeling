@@ -60,12 +60,12 @@ public class Cell
 
 public class Sampling : MonoBehaviour
 {
-    List<Point> confirmed = new List<Point>();
-    List<Point> possible = new List<Point>();
+    public static List<Point> confirmed = new List<Point>();
+    private static List<Point> possible = new List<Point>();
     public static float length = 10.0f;
     public static float maxrad = 0.2f;
     public static float minrad = 0.008f;
-    public static float radius = 0.2f;
+    public static float radius = 1.0f;
     int count = 0;
     int debugcount = 0;
     Texture2D Map;
@@ -146,11 +146,12 @@ public class Sampling : MonoBehaviour
             for (int i = 0; i < trycount; i++)                                                                    // 新頂点は15回以内に見つけなくてはならない
             {
                 
+                /* 点の密度変更オフ
                 radius = minrad + (maxrad - minrad) * (0.0f + Map.GetPixel(
                     (int)((possible[possible.Count - 1].Pos.x / length + 0.5f) * Map.width),
                     (int)((possible[possible.Count - 1].Pos.y / length + 0.5f) * Map.height)
                     ).grayscale);
-                    
+                */
 
                 float dis = UnityEngine.Random.RandomRange(radius, 2 * radius);
                 float dir = UnityEngine.Random.RandomRange(0f, 2 * Mathf.PI);
@@ -208,7 +209,7 @@ public class Sampling : MonoBehaviour
             }
         }
         
-
+        /*  描画モードオフ
         obj = (GameObject)Resources.Load("Circle");
         // Cubeプレハブを元に、インスタンスを生成、
         
@@ -225,7 +226,7 @@ public class Sampling : MonoBehaviour
         Debug.Log("Points: " + confirmed.Count);
         Debug.Log("Time  : " + sw.Elapsed);
         Debug.Log("CellN : " + cellN);
-
+        */
     }
 
     // Update is called once per frame
