@@ -132,7 +132,7 @@ public class Sampling : MonoBehaviour
             }
         }
 
-        sw.Start();
+        //sw.Start();
         confirmed.Add(new Point(0, 0.0f));
         possible.Add(confirmed[0]);
         Debug.Log(Coadination2Index(confirmed[0].Pos));
