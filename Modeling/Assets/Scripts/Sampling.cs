@@ -63,9 +63,9 @@ public class Sampling : MonoBehaviour
     public static List<Point> confirmed = new List<Point>();
     private static List<Point> possible = new List<Point>();
     public static float length = 10.0f;
-    public static float maxrad = 0.2f;
-    public static float minrad = 0.008f;
-    public static float radius = 1.0f;
+    public static float maxrad = 2.5f;
+    public static float minrad = 0.015f;
+    public static float radius = 2.5f;
     int count = 0;
     int debugcount = 0;
     Texture2D Map;
@@ -90,7 +90,7 @@ public class Sampling : MonoBehaviour
     void Start()
     {
         int trycount = 15;
-        Map = (Texture2D)Resources.Load("FUJILOGO");
+        Map = (Texture2D)Resources.Load("Thankyou");
         Debug.Log("Log2: " + Mathf.Log(length / maxrad, 2f));
         //cellN = Mathf.FloorToInt(Mathf.Log(length / maxrad, 2f));
         //cellN = (int)Mathf.Pow(2, cellN);
@@ -132,7 +132,7 @@ public class Sampling : MonoBehaviour
             }
         }
 
-        //sw.Start();
+        sw.Start();
         confirmed.Add(new Point(0, 0.0f));
         possible.Add(confirmed[0]);
         Debug.Log(Coadination2Index(confirmed[0].Pos));
@@ -146,13 +146,12 @@ public class Sampling : MonoBehaviour
             for (int i = 0; i < trycount; i++)                                                                    // 新頂点は15回以内に見つけなくてはならない
             {
                 
-                /* 点の密度変更オフ
+                /*
                 radius = minrad + (maxrad - minrad) * (0.0f + Map.GetPixel(
                     (int)((possible[possible.Count - 1].Pos.x / length + 0.5f) * Map.width),
                     (int)((possible[possible.Count - 1].Pos.y / length + 0.5f) * Map.height)
                     ).grayscale);
                 */
-
                 float dis = UnityEngine.Random.RandomRange(radius, 2 * radius);
                 float dir = UnityEngine.Random.RandomRange(0f, 2 * Mathf.PI);
                 Point P = new Point(possible[possible.Count - 1].Pos + new Vector2(Mathf.Cos(dir), Mathf.Sin(dir)) * dis);   // 新頂点候補P
@@ -208,8 +207,8 @@ public class Sampling : MonoBehaviour
 
             }
         }
-        
-        /*  描画モードオフ
+
+        /*
         obj = (GameObject)Resources.Load("Circle");
         // Cubeプレハブを元に、インスタンスを生成、
         
@@ -222,11 +221,17 @@ public class Sampling : MonoBehaviour
 
         Debug.Log(confirmed.Count);
 
-        sw.Stop();
+        //sw.Stop();
         Debug.Log("Points: " + confirmed.Count);
-        Debug.Log("Time  : " + sw.Elapsed);
+        //Debug.Log("Time  : " + sw.Elapsed);
         Debug.Log("CellN : " + cellN);
         */
+
+        
+        sw.Stop();
+        
+        Debug.Log("Points: " + confirmed.Count);
+        Debug.Log("Sampling Time : " + sw.Elapsed);
     }
 
     // Update is called once per frame

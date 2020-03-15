@@ -137,6 +137,7 @@ public class Delaunay : MonoBehaviour
     List<DPoint> PoiList = new List<DPoint>();
     float length = 10.0f;
     Triangle root;
+    System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
     void List2Mesh()
     {
         Array.Resize(ref _positions, PoiList.Count);
@@ -315,6 +316,90 @@ public class Delaunay : MonoBehaviour
         }
     }
 
+    void Split(DEdge E)
+    {
+        int index0 = 0;
+        int index1 = 0;
+
+        DPoint MidP = new DPoint((E.Ends[0].Pos + E.Ends[1].Pos) / 2.0f);
+
+        PoiList.Add(MidP);
+        Triangle F0 = E.Faces[0];
+        Triangle F1 = E.Faces[1];
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (F0.Edges[i] == E)
+            {
+                index0 = i;
+                break;
+            }
+        }
+
+        /*
+        Triangle NewF0 = new Triangle(F0.Vertices[index0], MidP, F0.Vertices[(index0 + 2) % 3]);
+        LefList.Add(NewF0);
+        Vector2 V1 = NewF0.Vertices[1].Pos - NewF0.Vertices[0].Pos;
+        Vector2 V2 = NewF0.Vertices[2].Pos - NewF0.Vertices[0].Pos;
+        if (V1.x * V2.y - V1.y * V2.x > 0) Debug.Log(LefList.Count);
+
+        NewF0.Edges[1] = F0.Edges[(index0 + 1) % 3];
+        DEdge split0 = new DEdge(F0.Vertices[index0], MidP, NewF0, F0);
+        NewF0.Edges[2] = split0;
+        F0.Edges[(index0 + 1) % 3] = split0;
+        F0.Vertices[(index0 + 2) % 3] = MidP;
+
+        if (NewF0.Edges[1].Faces[0] == F0) NewF0.Edges[1].Faces[0] = NewF0;
+        if (NewF0.Edges[1].Faces[1] == F0) NewF0.Edges[1].Faces[1] = NewF0;
+        */
+
+        if (F0 == F1)
+        {
+            Triangle NewF0 = new Triangle(F0.Vertices[index0], MidP, F0.Vertices[(index0 + 2) % 3]);
+            LefList.Add(NewF0);
+            NewF0.Edges[1] = F0.Edges[(index0 + 1) % 3];
+            DEdge split0 = new DEdge(F0.Vertices[index0], MidP, NewF0, F0);
+            NewF0.Edges[2] = split0;
+            F0.Edges[(index0 + 1) % 3] = split0;
+            F0.Vertices[(index0 + 2) % 3] = MidP;
+            F0.Edges[index0].Ends[0] = MidP;
+            F0.Edges[index0].Ends[1] = F0.Vertices[(index0 + 1) % 3];
+
+            if (NewF0.Edges[1].Faces[0] == F0) NewF0.Edges[1].Faces[0] = NewF0;
+            if (NewF0.Edges[1].Faces[1] == F0) NewF0.Edges[1].Faces[1] = NewF0;
+
+            /////////////////////////////////////////////////////////////////////
+
+            DEdge add0 = new DEdge(NewF0.Vertices[1], NewF0.Vertices[2], NewF0, NewF0);
+            NewF0.Edges[0] = add0;
+
+        } else
+        {
+            /*
+            for (int i = 0; i < 3; i++)
+            {
+                if (E.Faces[1].Edges[i] == E)
+                {
+                    index1 = i;
+                    break;
+                }
+            }
+
+            Triangle NewF1 = new Triangle(F1.Vertices[index1], F1.Vertices[(index1 + 1) % 3], MidP);
+            //LefList.Add(NewF1);
+            NewF0.Edges[0] = new DEdge(MidP, NewF0.Vertices[2], NewF0, NewF1);
+            F1.Vertices[(index1 + 1) % 3] = MidP;
+            DEdge split1 = new DEdge(F1.Vertices[index1], MidP, NewF1, F1);
+            NewF1.Edges[0] = NewF0.Edges[0];
+            NewF1.Edges[1] = split1;
+            NewF1.Edges[2] = F1.Edges[(index1 + 2) % 3];
+            F1.Edges[(index1 + 2) % 3] = split1;
+
+            if (NewF1.Edges[2].Faces[0] == F1) NewF1.Edges[2].Faces[0] = NewF1;
+            if (NewF1.Edges[2].Faces[1] == F1) NewF1.Edges[2].Faces[1] = NewF1;*/
+        }
+    }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -333,6 +418,7 @@ public class Delaunay : MonoBehaviour
         PoiList.Add(root.Vertices[0]);
         PoiList.Add(root.Vertices[1]);
         PoiList.Add(root.Vertices[2]);
+
         
         for (int i = 0; i < Sampling.confirmed.Count; i++)
         {
@@ -341,6 +427,15 @@ public class Delaunay : MonoBehaviour
             Triangle Target = SearchLeaf(DP, root);
             AddDPoint(DP, Target);
         }
+
+        /* ランダムサンプリングで作るメッシュ
+        for (int i = 0; i < 260; i++)
+        {
+            DPoint DP = new DPoint(new Vector2(UnityEngine.Random.Range(-5.0f, 5.0f), UnityEngine.Random.Range(-5.0f, 5.0f)));
+
+            Triangle Target = SearchLeaf(DP, root);
+            AddDPoint(DP, Target);
+        }*/
 
         bool outTriangle;
         for (int i = TriList.Count - 1; i >= 0 ; i--)
@@ -354,6 +449,11 @@ public class Delaunay : MonoBehaviour
                     if (TriList[i].Vertices[j] == PoiList[k])
                     {
                         outTriangle = true;
+
+                        if (TriList[i].Edges[j].Faces[0] == TriList[i]) TriList[i].Edges[j].Faces[0] = TriList[i].Edges[j].Faces[1];
+                        if (TriList[i].Edges[j].Faces[1] == TriList[i]) TriList[i].Edges[j].Faces[1] = TriList[i].Edges[j].Faces[0];
+
+
                         break;
                     }
                         
@@ -384,16 +484,41 @@ public class Delaunay : MonoBehaviour
         {
             if (TriList[i].Children.Count == 0) LefList.Add(TriList[i]);
         }
+
+        // この時点でPoiList，LefListは描画に過不足ない
+
+        for (int i = 0; i < PoiList.Count; i++)
+        {
+            if (PoiList[i].Pos.x > 5.0f)
+            {
+                Debug.Log(i + ": " + PoiList[i].Pos);
+            }
+        }
+
+        List2Mesh();
+        sw.Stop();
+        Debug.Log("Subdivide Time : " + sw.Elapsed);
     }
 
     private void Awake()
     {
+        sw.Start();
+        
         _mesh = new Mesh();
+
     }
 
     // Update is called once per frame
     void Update()
     {
+        
+        float randF = UnityEngine.Random.value;
+        if (randF < 1.3f)
+        {
+            int randI1 = UnityEngine.Random.Range(0, LefList.Count);
+            int randI2 = UnityEngine.Random.Range(0, 3);
+            Split(LefList[randI1].Edges[randI2]);
+        }
         List2Mesh();
         Graphics.DrawMesh(_mesh, Vector3.zero, Quaternion.identity, _material, 0);
     }
