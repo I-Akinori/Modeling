@@ -244,8 +244,11 @@ public class CreateMesh : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))    // テスト用 左クリックを押したときの処理
         {
-
+            
         }
+        int Rand1 = UnityEngine.Random.Range(0, _halfedges.Count);
+        EdgeSwap(_halfedges[Rand1]);
+
         List2Array();
 
         Array.Resize(ref _positions, _vertices.Count);

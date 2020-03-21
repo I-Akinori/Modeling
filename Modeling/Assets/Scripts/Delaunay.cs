@@ -9,11 +9,14 @@ public class DPoint
     private Vector2 pos;
     private int index;
 
+    private bool additional;        // スプリットで追加された点 
+
     public DPoint(float x, float y)
     {
         index = count;
         count++;
         pos = new Vector2(x, y);
+        additional = false;
     }
 
     public DPoint(Vector2 v)
@@ -21,6 +24,7 @@ public class DPoint
         index = count;
         count++;
         pos = v;
+        additional = false;
     }
 
     public DPoint(Point P)
@@ -28,6 +32,7 @@ public class DPoint
         index = count;
         count++;
         pos = P.Pos;
+        additional = false;
     }
 
     public Vector2 Pos
@@ -44,6 +49,11 @@ public class DPoint
     {
         set { index = value; }
         get { return index; }
+    }
+    public bool Additional
+    {
+        set { additional = value; }
+        get { return additional; }
     }
 }
 
@@ -138,6 +148,7 @@ public class Delaunay : MonoBehaviour
     float length = 10.0f;
     Triangle root;
     System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+    GameObject obj;
     void List2Mesh()
     {
         Array.Resize(ref _positions, PoiList.Count);
@@ -318,10 +329,15 @@ public class Delaunay : MonoBehaviour
 
     bool Split(DEdge E)
     {
+        if (Area(E.Faces[0]) < 1.0f) return false;
+        if (Area(E.Faces[1]) < 1.0f) return false;
+        if (Vector2.Distance(E.Ends[0].Pos, E.Ends[1].Pos) < 2.0f) return false;
+
         int index0 = 0;
         int index1 = 0;
 
         DPoint MidP = new DPoint((E.Ends[0].Pos + E.Ends[1].Pos) / 2.0f);
+        MidP.Additional = true;
 
         PoiList.Add(MidP);
         Triangle F0 = E.Faces[0];
@@ -415,17 +431,8 @@ public class Delaunay : MonoBehaviour
 
             bool neadFlip = true;
 
-            /*
-            Vector2 V01 = F0.Vertices[(index0 + 1) % 3].Pos - F0.Vertices[index0].Pos;
-            Vector2 V02 = F0.Vertices[(index0 + 2) % 3].Pos - F0.Vertices[index0].Pos;
-            Vector2 V11 = F1.Vertices[(index1 + 1) % 3].Pos - F1.Vertices[index1].Pos;
-            Vector2 V12 = F1.Vertices[(index1 + 2) % 3].Pos - F1.Vertices[index1].Pos;
-
-            if ((V01.x * V12.y - V01.y * V12.x) * (V11.x * V02.y - V11.y * V02.x) < 0) neadFlip = false;
-            */
-
-            if (!Front(F0.Vertices[index0], F0.Vertices[(index0 + 1) % 3], F1.Vertices[index1]) ||
-                !Front(F1.Vertices[index1], F1.Vertices[(index1 + 1) % 3], F0.Vertices[index0])) neadFlip = false;
+            if (Area(F0.Vertices[index0], F0.Vertices[(index0 + 1) % 3], F1.Vertices[index1]) <= 0.5f ||
+                Area(F1.Vertices[index1], F1.Vertices[(index1 + 1) % 3], F0.Vertices[index0]) <= 0.5f) neadFlip = false;
 
             if (neadFlip)
             {
@@ -463,6 +470,7 @@ public class Delaunay : MonoBehaviour
         DEdge left;
         DEdge right;
         int indexT = 0;
+        int tmpEi;
         bool needCollapse = true;
 
         List<Triangle> needMoveT = new List<Triangle>();
@@ -470,8 +478,174 @@ public class Delaunay : MonoBehaviour
         List<int> Tindex = new List<int>();
         List<int> Eindex = new List<int>();
 
-        int debug = 0;
-        if (F0 != F1)
+        if (F0 == F1)
+        {
+            if (Center.Additional)
+            {
+                return false;
+                for (int i = 0; i < 3; i++)
+                {
+                    if (F0.Vertices[i] == Center)
+                        index0 = i;
+                }
+                if (F0.Vertices[(index0 + 1) % 3] == Moved) {
+                    // 時計回り探索
+                    right = F0.Edges[(index0 + 1) % 3];
+                    tmpE = right;
+
+                    int rigi = right.Ends[0] == Center ? 0 : 1;
+
+                    int debug = 0;
+                    while (tmpE.Faces[0] != tmpE.Faces[1])
+                    {
+                        debug++;
+                        if (debug > 10)
+                        {
+                            Debug.Log("Timeout1");
+                            break;
+                        }
+
+                        tmpEi = tmpE.Ends[0] == Center ? 0 : 1;
+                        tmpF = tmpE.Faces[tmpEi];
+                        
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (tmpF.Vertices[i] == Center)
+                            {
+                                indexT = i;
+                                break;
+                            }
+                        }
+
+                        if (Area(Moved, tmpF.Vertices[(indexT + 1) % 3], tmpF.Vertices[(indexT + 2) % 3]) < 0.5f)
+                        {
+                            needCollapse = false;
+                            break;
+                        }
+
+                        needMoveE.Add(tmpE);
+                        Eindex.Add(tmpEi);
+                        needMoveT.Add(tmpF);
+                        Tindex.Add(indexT);
+
+                        tmpE = tmpF.Edges[(indexT + 1) % 3];
+                    }
+                    left = tmpE;
+
+                    if (needCollapse)
+                    {
+                        if (left == right) {
+                            Debug.Log("Left == right");
+                            Debug.Log("Movement: " + Center.Pos + " -> " + Moved.Pos);
+                            Debug.Log("left (right): " + left.Ends[0].Pos + " -> " + left.Ends[1].Pos);
+                        }
+
+                        for (int i = 0; i < needMoveE.Count; i++)
+                        {
+                            needMoveE[i].Ends[Eindex[i]] = Moved;
+                        }
+                        for (int i = 0; i < needMoveT.Count; i++)
+                        {
+                            needMoveT[i].Vertices[Tindex[i]] = Moved;
+                        }
+
+                        tmpEi = F0.Edges[index0].Ends[0] == Moved ? 0 : 1;
+                        if (F0.Edges[index0].Faces[(tmpEi + 1) % 2] == F0)
+                        {
+                            right.Faces[(rigi + 1) % 2] = right.Faces[rigi];
+                        }
+                        else
+                        {
+                            if (F0.Edges[index0].Faces[(tmpEi + 1) % 2].Edges[0] == F0.Edges[index0]) F0.Edges[index0].Faces[(tmpEi + 1) % 2].Edges[0] = right;
+                            if (F0.Edges[index0].Faces[(tmpEi + 1) % 2].Edges[1] == F0.Edges[index0]) F0.Edges[index0].Faces[(tmpEi + 1) % 2].Edges[1] = right;
+                            if (F0.Edges[index0].Faces[(tmpEi + 1) % 2].Edges[2] == F0.Edges[index0]) F0.Edges[index0].Faces[(tmpEi + 1) % 2].Edges[2] = right;
+
+                            right.Faces[(rigi + 1) % 2] = F0.Edges[index0].Faces[(tmpEi + 1) % 2];
+                        }
+
+                        LefList.Remove(F0);
+                        return true;
+                    }
+                }
+                else
+                {
+                    return false;
+                    if (F0.Vertices[(index0 + 2) % 3] != Moved) return false;   // 本来あり得ないはずなのにたまにこれに行く　要検討
+                    // 反時計回り探索
+                    left = F0.Edges[(index0 + 2) % 3];
+                    tmpE = left;
+
+                    int debug = 0;
+                    while (tmpE.Faces[0] != tmpE.Faces[1])
+                    {
+                        debug++;
+                        if (debug > 10)
+                        {
+                            Debug.Log("Timeout3");
+                            break;
+                        }
+
+                        tmpEi = tmpE.Ends[0] == Center ? 0 : 1;
+                        tmpF = tmpE.Faces[(tmpEi + 1) % 2];
+
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (tmpF.Vertices[i] == Center)
+                            {
+                                indexT = i;
+                                break;
+                            }
+                        }
+
+                        if (Area(Moved, tmpF.Vertices[(indexT + 1) % 3], tmpF.Vertices[(indexT + 2) % 3]) < 0.5f)
+                        {
+                            needCollapse = false;
+                            break;
+                        }
+
+                        needMoveE.Add(tmpE);
+                        Eindex.Add(tmpEi);
+                        needMoveT.Add(tmpF);
+                        Tindex.Add(indexT);
+
+                        tmpE = tmpF.Edges[(indexT + 2) % 3];
+                    }
+                    right = tmpE;
+
+                    if (needCollapse)
+                    {
+                        for (int i = 0; i < needMoveE.Count; i++)
+                        {
+                            needMoveE[i].Ends[Eindex[i]] = Moved;
+                        }
+                        for (int i = 0; i < needMoveT.Count; i++)
+                        {
+                            needMoveT[i].Vertices[Tindex[i]] = Moved;
+                        }
+
+                        tmpEi = F0.Edges[index0].Ends[0] == Moved ? 0 : 1;
+                        if (F0.Edges[index0].Faces[tmpEi] == F0)
+                        {
+                            Debug.Log("Eindex[0]: " + Eindex[0]);
+                            left.Faces[Eindex[0]] = left.Faces[(Eindex[0] + 1) % 2];
+                            
+                        }
+                        else
+                        {
+                            if (F0.Edges[index0].Faces[tmpEi].Edges[0] == F0.Edges[index0]) F0.Edges[index0].Faces[tmpEi].Edges[0] = left;
+                            if (F0.Edges[index0].Faces[tmpEi].Edges[1] == F0.Edges[index0]) F0.Edges[index0].Faces[tmpEi].Edges[1] = left;
+                            if (F0.Edges[index0].Faces[tmpEi].Edges[2] == F0.Edges[index0]) F0.Edges[index0].Faces[tmpEi].Edges[2] = left;
+
+                            left.Faces[Eindex[0]] = F0.Edges[index0].Faces[tmpEi];
+                        }
+
+                        LefList.Remove(F0);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }else
         {
             for (int i = 0; i < 3; i++)
             {
@@ -494,21 +668,19 @@ public class Delaunay : MonoBehaviour
             right = F0.Edges[(index0 + 1) % 3];
             tmpE = right;
 
+            int debug = 0;
             do
             {
                 debug++;
                 if (debug > 20)
                 {
-                    Debug.Log("Falure");
-                    if (right == left)
-                        Debug.Log("right == left");
+                    Debug.Log("Timeout 2");
                     break;
                 }
-
-                if (tmpE.Faces[0] == tmpE.Faces[1])                 // 輪郭が変わるような変形はNG → F0.[index0] が端ならこれの移動はあきらめる
+                if (tmpE.Faces[0] == tmpE.Faces[1])                 // 輪郭が変わるような変形はNG → F0.Vertices[index0] が端なら これの移動はあきらめる
                 {
-                    needCollapse = false;
-                    break;
+                     needCollapse = false;
+                     break;
                 }
 
                 needMoveE.Add(tmpE);                                // right は要素の最初
@@ -524,7 +696,7 @@ public class Delaunay : MonoBehaviour
                     }
                 }
 
-                if (!Front(Moved, tmpF.Vertices[(indexT + 1) % 3], tmpF.Vertices[(indexT + 2) % 3]))
+                if (Area(Moved, tmpF.Vertices[(indexT + 1) % 3], tmpF.Vertices[(indexT + 2) % 3]) <= 0.5f)
                 {
                     needCollapse = false;
                     break;
@@ -598,7 +770,7 @@ public class Delaunay : MonoBehaviour
                     }
                 }
 
-                if (F0.Edges[index0].Faces[0] == F0.Edges[index0].Faces[1])                                 // left が輪郭辺となるとき
+                if (F0.Edges[index0].Faces[0] == F0.Edges[index0].Faces[1])                                 // right が輪郭辺となるとき
                 {
                     right.Faces[(Eindex[0] + 1) % 2] = right.Faces[Eindex[0]];
                 }
@@ -627,16 +799,16 @@ public class Delaunay : MonoBehaviour
         return false;
     }
 
-    bool Front(Triangle T)
+    float Area(Triangle T)
     {
-        return Front(T.Vertices[0], T.Vertices[1], T.Vertices[2]);
+        return Area(T.Vertices[0], T.Vertices[1], T.Vertices[2]);
     }
-    bool Front(DPoint P1, DPoint P2, DPoint P3)
+    float Area(DPoint P1, DPoint P2, DPoint P3)
     {
         Vector2 V12 = P2.Pos - P1.Pos;
         Vector2 V23 = P3.Pos - P2.Pos;
 
-        return V12.x * V23.y - V12.y * V23.x < 0;
+        return V23.x * V12.y - V23.y * V12.x;
     }
     // Start is called before the first frame update
     void Start()
@@ -725,31 +897,33 @@ public class Delaunay : MonoBehaviour
 
         // この時点でPoiList，LefListは描画に過不足ない
 
-        for (int i = 0; i < PoiList.Count; i++)
-        {
-            if (PoiList[i].Pos.x > 5.0f)
-            {
-                Debug.Log(i + ": " + PoiList[i].Pos);
-            }
-        }
-
         List2Mesh();
-        sw.Stop();
-        Debug.Log("Subdivide Time : " + sw.Elapsed);
     }
 
     private void Awake()
     {
-        sw.Start();
-        
         _mesh = new Mesh();
-
+        obj = (GameObject)Resources.Load("Circle");
     }
 
     // Update is called once per frame
     void Update()
     {
-        
+        /*
+        GameObject[] targets = GameObject.FindGameObjectsWithTag("marker");
+
+        foreach (GameObject GO in targets)
+        {
+            Destroy(GO);
+        }
+        foreach (DPoint P in PoiList)
+        {
+            GameObject clone = Instantiate(obj, new Vector3(P.Pos.x, P.Pos.y, 0.0f), Quaternion.identity);
+            clone.tag = "marker"; 
+            clone.transform.rotation = Quaternion.Euler(-90f, 0f, 0f);
+            clone.GetComponent<Renderer>().material.color = new Color(255f / 255f, 0f / 255f, 0f / 255f);
+        }*/
+
         float randF = UnityEngine.Random.value;
         if (randF < 1.1f)
         {
@@ -771,6 +945,7 @@ public class Delaunay : MonoBehaviour
             {
                 if (LefList[i].Edges[j].Ends[0] == LefList[i].Vertices[(j + 1) % 3] && LefList[i].Edges[j].Faces[0] != LefList[i]) Debug.Log("Error 0");
                 if (LefList[i].Edges[j].Ends[1] == LefList[i].Vertices[(j + 1) % 3] && LefList[i].Edges[j].Faces[1] != LefList[i]) Debug.Log("Error 1");
+                if (Area(LefList[i]) < 0.1f) Debug.Log("Error 4: " + Area(LefList[i]) + LefList[i].Vertices[0].Pos + ", " + LefList[i].Vertices[1].Pos + ", " + LefList[i].Vertices[2].Pos);
             }
         }
         List2Mesh();
